@@ -36,8 +36,6 @@ logging.getLogger("uvicorn.access").addFilter(EndpointFilter(excluded_endpoints)
 app = FastAPI(
     title='Pusoy', 
     version='0.0.1',
-    root_path='/pusoy-bots-sai',
-    root_path_in_servers=False,
 )
 #router = APIRouter(lifespan=lifespan)
 
