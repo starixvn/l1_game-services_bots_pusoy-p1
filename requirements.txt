@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+treys
+numpy
+pandas
+psutil
+# tensorflow
+keras
+redis
+celery
+python-dotenv
+celery[redis]
+fastapi[redis]
+fastapi-cache2[redis]
