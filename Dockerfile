@@ -19,7 +19,7 @@ RUN apt update \
 COPY . .
 
 # Expose the port
-EXPOSE 80
+EXPOSE 5000
 
 # Set the command to run your application
 CMD ["bash", "run.sh"]
