@@ -25,6 +25,7 @@ from main import process
 from fastapi import Request
 from fastapi.responses  import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from prometheus_fastapi_instrumentator import Instrumentator
 
 uvicorn_logger = logging.getLogger("uvicorn.access")
 uvicorn_logger.addFilter(EndpointFilter(path="/"))
@@ -47,6 +48,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/")
 async def read_root():

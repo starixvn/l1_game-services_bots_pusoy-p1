@@ -5,6 +5,7 @@ treys
 numpy
 pandas
 psutil
+prometheus-fastapi-instrumentator==6.1.0
 # tensorflow
 keras
 redis
