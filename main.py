@@ -52,9 +52,6 @@ if __name__ == "__main__":
     start_time = time.time()
 
     import numpy as np
-    import tracemalloc
-
-    tracemalloc.start()
 
     list_time = []
     for i in range(10):
@@ -62,13 +59,10 @@ if __name__ == "__main__":
         np.random.shuffle(full_deck)
         list_card_value = full_deck[:13]
         start_time_algo = time.time()
-        output = suggest_v1(list_card_value)
+        output = move_v1(pusoy_bot, list_card_value)
         end_time_algo = time.time()
         list_time.append(end_time_algo - start_time_algo)
     print("Average time: ", np.mean(list_time))
-    current, peak = tracemalloc.get_traced_memory()
-    print('Current and peak memory usage: {}[MB] {}[MB]'.format(current/(1024*1024), peak/(1024*1024)))
-    tracemalloc.stop()
 
     end_time = time.time()
     print("Elapsed time: ", end_time - start_time)         

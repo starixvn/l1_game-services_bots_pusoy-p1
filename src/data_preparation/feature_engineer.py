@@ -5,7 +5,6 @@ from src.utils.poker_evaluator import ChinesePokerEvaluator
 from src.utils.utils import Utils
 import time
 import itertools
-import gc
 from collections import defaultdict
 import math
 
@@ -157,7 +156,6 @@ class FeatureEngineering(object):
         return all_data_avg_point
 
     def is_specific_combo_type(self, combo_type, rank, is_front_hand):
-        assert combo_type in self.list_combo_type
         actual_combo_type = self.utils.get_combo_type(rank, is_front_hand)
         return int(actual_combo_type == combo_type)
 
@@ -302,5 +300,4 @@ class FeatureEngineering(object):
         assert dataset.isnull().sum().sum() == 0
 
         del all_data_avg_point
-        gc.collect()
         return dataset

@@ -13,13 +13,15 @@ from keras.models import load_model
 class PusoyBot(object):
     def __init__(self, 
                 board=None,
-                model_dir=r"src/model/multi_layer_perceptron.keras"):
+                model_dir=r"src/model/multi_layer_perceptron.keras",
+                n_potential_candidate_arrangement=200):
         self.board = board if board is not None else Deck().draw(13)
         self.evaluator = ChinesePokerEvaluator() 
         self.utils = Utils()
         self.MLP_model = load_model(model_dir)
         self.feature_engineer = FeatureEngineering()
         self.normalizer = Normalization()
+        self.n_potential_candidate_arrangement = n_potential_candidate_arrangement
 
     def is_trivial_arrangement(self, back_rank, mid_rank):
         back_type = self.utils.get_combo_type(back_rank)
@@ -83,6 +85,14 @@ class PusoyBot(object):
         return pd.DataFrame(data_arrangement).drop_duplicates(subset=["back_rank", "mid_rank", "front_rank", 
                                         "back_suit_strength", "mid_suit_strength", "front_suit_strength"])
 
+    def filter_potential_candidate_arrangement(self, data_arrange):
+        data_arrange = self.feature_engineer.create_proba_columns(data_arrange)
+        data_arrange["total_proba"] = data_arrange["back_proba"] + data_arrange["mid_proba"] + data_arrange["front_proba"]
+        data_arrange.sort_values(by="total_proba", ascending=False, inplace=True)
+        data_arrange.reset_index(drop=True, inplace=True)
+        data_arrange.drop(columns=["back_proba", "mid_proba", "front_proba", "total_proba"], inplace=True)
+        return data_arrange.iloc[:self.n_potential_candidate_arrangement]
+
     def update_average_point_of_natural_win_3_straight_and_3_flush(self, data_arrange):
         #For the row which is is_3_straight = True or is_3_flush = True, we will update the Average_Point_Predicted to 9.0
         data_arrange.loc[data_arrange["is_3_straight"] | data_arrange["is_3_flush"], 
@@ -93,13 +103,23 @@ class PusoyBot(object):
         dataset = self.feature_engineer.transform(data_arrange.copy())
         self.normalizer.normalize_dataset(dataset)
         X = dataset.values
+        del dataset
         y = self.MLP_model.predict(X)
         data_arrange["Average_Point_Predicted"] = y
+        del X, y
         return data_arrange
     
     def gen_database_arrangement_with_predict_average_point(self):
+        start_time = time.time()
         data_arrange = self.gen_database_arrangement()
+        end_time_1 = time.time()
+        print(f"\nExecution time to generate database arrangement: {end_time_1 - start_time} seconds")
+        data_arrange = self.filter_potential_candidate_arrangement(data_arrange)
+        end_time_2 = time.time()
+        print(f"Execution time to filter potential candidate arrangement: {end_time_2 - end_time_1} seconds")
         data_arrange = self.predict_average_point(data_arrange)
+        end_time_3 = time.time()
+        print(f"Execution time to predict average point: {end_time_3 - end_time_2} seconds")
         data_arrange = self.update_average_point_of_natural_win_3_straight_and_3_flush(data_arrange)
         return data_arrange
 
@@ -107,6 +127,7 @@ class PusoyBot(object):
         data_arrange = self.gen_database_arrangement_with_predict_average_point()
         data_arrange.reset_index(drop=True, inplace=True)
         best_arrangement = data_arrange.loc[data_arrange["Average_Point_Predicted"].idxmax()].to_dict()
+        del data_arrange
         return best_arrangement
 
     def gen_sorted_database_arrangement_with_predict_average_point(self):
