@@ -22,10 +22,6 @@ class FeatureEngineering(object):
         self.mapping_rank_int_to_str = {0: "deuce", 1: "trey", 2: "four", 3: "five", 4: "six", 5: "seven", 
                             6: "eight", 7: "nine", 8: "ten", 9: "jack", 10: "queen", 11: "king", 12: "ace"}
         self.list_key_board_remain_info = self.__get_list_key_board_remain_info()
-        self.list_back_card_name = [f"back_card_{i}" for i in range(1, 6)]
-        self.list_mid_card_name = [f"mid_card_{i}" for i in range(1, 6)]
-        self.list_front_card_name = [f"front_card_{i}" for i in range(1, 4)]
-        self.list_full_card_name = self.list_back_card_name + self.list_mid_card_name + self.list_front_card_name
         self.mapping_rank_count_hist_to_n_Six_Pair = self.__get_mapping_rank_count_hist_to_n_Six_Pair()
         self.mapping_len_card_rank_by_suit_to_n_Three_Flush = self.__get_mapping_len_card_rank_by_suit_to_n_Three_Flush()
         self.path_proba_folder = path_proba_folder
@@ -146,21 +142,17 @@ class FeatureEngineering(object):
         return tuple(board_remain_info[key] for key in self.list_key_board_remain_info)
     
     def gen_stats_board_remain_info_column(self, all_data_avg_point):
-        # print("\nGenerate stats board remain info column")
         set_full_deck = set(Deck().cards)
         first_row = all_data_avg_point.iloc[0]
-        board = tuple(first_row[self.list_full_card_name])
+        board = first_row["back_card"] + first_row["mid_card"] + first_row["front_card"]
         board_remain_info = self.cal_board_remain_info(board, set_full_deck)
         all_data_avg_point[self.list_key_board_remain_info] = board_remain_info
-
-        return all_data_avg_point
 
     def is_specific_combo_type(self, combo_type, rank, is_front_hand):
         actual_combo_type = self.utils.get_combo_type(rank, is_front_hand)
         return int(actual_combo_type == combo_type)
 
     def gen_binary_feature_for_bonus_combo(self, all_data_avg_point):
-        # print("\nGenerate binary feature for bonus combo")
         for combo_type in self.list_combo_type:
             if combo_type == "High Card": continue
             all_data_avg_point[f"is_{combo_type.replace(' ', '_')}_back"] = all_data_avg_point["back_rank"].apply(
@@ -170,9 +162,7 @@ class FeatureEngineering(object):
                             lambda x: self.is_specific_combo_type(combo_type, x, is_front_hand=False))
         for combo_type in ["Three of a Kind", "Pair", "High Card"]:
             all_data_avg_point[f"is_{combo_type.replace(' ', '_')}_front"] = all_data_avg_point["front_rank"].apply(
-                            lambda x: self.is_specific_combo_type(combo_type, x, is_front_hand=True))
-        
-        return all_data_avg_point
+                            lambda x: self.is_specific_combo_type(combo_type, x, is_front_hand=True))       
 
     def __count_n_RoyalFlush_StraightFlush(self, list_card_rank_by_suit):
         n_Royal_Flush = 0
@@ -240,14 +230,12 @@ class FeatureEngineering(object):
         return n_Royal_Flush, n_Straight_Flush, n_Flush, n_Straight, n_Dragon, n_Six_Pair, n_Three_Flush
 
     def gen_stats_combo_type_board_remain_column(self, all_data_avg_point):
-        # print("\nGenerate stats combo type board remain column")
         set_full_deck = set(Deck().cards)
         first_row = all_data_avg_point.iloc[0]
-        board = tuple(first_row[self.list_full_card_name])
+        board = first_row["back_card"] + first_row["mid_card"] + first_row["front_card"]
         combo_type_board_remain = self.cal_combo_type_board_remain(board, set_full_deck)
         all_data_avg_point[["n_Royal_Flush", "n_Straight_Flush", "n_Flush",
             "n_Straight", "n_Dragon", "n_Six_Pair", "n_Three_Flush"]] = combo_type_board_remain
-        return all_data_avg_point
 
     def create_mapping_front_rank_to_int_strength(self):
         df = pd.read_csv(self.path_csv_file_mapping)
@@ -261,18 +249,13 @@ class FeatureEngineering(object):
         return dict(zip(df["rank"], df["rank_strength"]))
     
     def transform_front_rank_to_int_strength(self, all_data_avg_point):
-        # print("\nTransform front_rank to int strength")
         all_data_avg_point["front_rank"] = all_data_avg_point["front_rank"].map(self.map_front_rank_to_int_strength)
-        return all_data_avg_point
 
     def transform_Four_Three_Full_House_back_mid_rank(self, all_data_avg_point):
-        # print("\nTransform Four of a Kind, Three of a Kind, Full House back and mid rank")
         all_data_avg_point["back_rank"] = all_data_avg_point["back_rank"].map(self.rank_mapping)
         all_data_avg_point["mid_rank"] = all_data_avg_point["mid_rank"].map(self.rank_mapping)
-        return all_data_avg_point
 
     def create_proba_columns(self, all_data_avg_point):
-        # print("\nCreating proba columns")
         all_data_avg_point["back_proba"] = (all_data_avg_point["back_rank"].astype(str) + ", " \
                         + all_data_avg_point["back_suit_strength"].astype(str)).map(self.database_search_back)
         all_data_avg_point["mid_proba"] = (all_data_avg_point["mid_rank"].astype(str) + ", " \
@@ -281,21 +264,18 @@ class FeatureEngineering(object):
                         + all_data_avg_point["front_suit_strength"].astype(str)).map(self.database_search_front)
         assert all_data_avg_point["back_proba"].isna().sum() == 0 and all_data_avg_point["mid_proba"].isna().sum() == 0 and \
                 all_data_avg_point["front_proba"].isna().sum() == 0
-        return all_data_avg_point
 
     def transform(self, all_data_avg_point):
         all_data_avg_point.reset_index(drop=True, inplace=True)
-        all_data_avg_point = self.gen_stats_board_remain_info_column(all_data_avg_point)
-        all_data_avg_point = self.gen_stats_combo_type_board_remain_column(all_data_avg_point)
-        all_data_avg_point = self.gen_binary_feature_for_bonus_combo(all_data_avg_point)
-        all_data_avg_point = self.create_proba_columns(all_data_avg_point)
-        all_data_avg_point = self.transform_front_rank_to_int_strength(all_data_avg_point)
-        all_data_avg_point = self.transform_Four_Three_Full_House_back_mid_rank(all_data_avg_point)
+        self.gen_stats_board_remain_info_column(all_data_avg_point)
+        self.gen_stats_combo_type_board_remain_column(all_data_avg_point)
+        self.gen_binary_feature_for_bonus_combo(all_data_avg_point)
+        # self.create_proba_columns(all_data_avg_point)
+        self.transform_front_rank_to_int_strength(all_data_avg_point)
+        self.transform_Four_Three_Full_House_back_mid_rank(all_data_avg_point)
         
-        feature_cols = list(all_data_avg_point.columns.difference(self.list_full_card_name + 
-                                                                ["is_3_straight", "is_3_flush"]))
-        # print("Feature columns:", feature_cols)
-        # print("The number of feature columns: {:,}".format(len(feature_cols)))
+        feature_cols = list(all_data_avg_point.columns.difference(["is_3_straight", "is_3_flush",
+                                                            "back_card", "mid_card", "front_card"]))
         dataset = all_data_avg_point[feature_cols].copy()
         assert dataset.isnull().sum().sum() == 0
 

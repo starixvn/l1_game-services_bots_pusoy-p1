@@ -6,6 +6,7 @@ from src.utils.utils import Utils
 from src.utils.poker_evaluator import ChinesePokerEvaluator
 from src.data_preparation.feature_engineer import FeatureEngineering
 from src.data_preparation.normalization import Normalization
+from treys.lookup import LookupTable
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from keras.models import load_model
@@ -14,7 +15,7 @@ class PusoyBot(object):
     def __init__(self, 
                 board=None,
                 model_dir=r"src/model/multi_layer_perceptron.keras",
-                n_potential_candidate_arrangement=200):
+                n_potential_candidate_arrangement=512):
         self.board = board if board is not None else Deck().draw(13)
         self.evaluator = ChinesePokerEvaluator() 
         self.utils = Utils()
@@ -23,35 +24,21 @@ class PusoyBot(object):
         self.normalizer = Normalization()
         self.n_potential_candidate_arrangement = n_potential_candidate_arrangement
 
-    def is_trivial_arrangement(self, back_rank, mid_rank):
-        back_type = self.utils.get_combo_type(back_rank)
-        mid_type = self.utils.get_combo_type(mid_rank)
-        if (back_type == "High Card") or (back_type == "Pair" and mid_type == "High Card"):
-            return True
-        return False
-
-    def update_arrangement_info_with_back_mid_front_card(self, arrangement_info, 
-                                                back_card, mid_card, front_card):
-        back_card_dict = {f"back_card_{i+1}": card for i, card in enumerate(back_card)}
-        mid_card_dict = {f"mid_card_{i+1}": card for i, card in enumerate(mid_card)}
-        front_card_dict = {f"front_card_{i+1}": card for i, card in enumerate(front_card)}
-        arrangement_info.update(back_card_dict)
-        arrangement_info.update(mid_card_dict)
-        arrangement_info.update(front_card_dict)
-
     def gen_database_arrangement(self) -> pd.DataFrame:
         """
         This function is used to generate the database of all possible arrangements of the given 13 cards.
         """
-        data_arrangement = []
+        data_arrangement_with_card = dict()
         for back_card in itertools.combinations(self.board, 5):
-            back_rank = self.evaluator.evaluate(back_card, tuple())           
+            back_rank = self.evaluator.evaluate(back_card, tuple())  
+            if back_rank > 6185: continue         
 
             board_remain = [card for card in self.board if card not in back_card]
             for mid_card in itertools.combinations(board_remain, 5):
                 mid_rank = self.evaluator.evaluate(mid_card, tuple())                
 
-                if back_rank <= mid_rank:  # The strength of back combo must be greater than or equal to the mid combo                    
+                if back_rank <= mid_rank:  # The strength of back combo must be greater than or equal to the mid combo
+                    if (3325 < back_rank <= 6185) and (mid_rank > 6185): continue                    
                     front_card = tuple([card for card in board_remain if card not in mid_card])
                     front_rank = self.evaluator.evaluate(front_card, tuple())
                     
@@ -60,67 +47,80 @@ class PusoyBot(object):
                         mid_suit_strength = self.utils.get_suit_strength_back_mid(mid_card, mid_rank)
                         if back_rank == mid_rank and back_suit_strength < mid_suit_strength:
                             continue
-                        if self.is_trivial_arrangement(back_rank, mid_rank):
-                            continue
                         front_suit_strength = self.utils.get_suit_strength_front(front_card, front_rank)
 
-                        arrangement_info = {
-                            "back_rank": back_rank,
-                            "mid_rank": mid_rank,
-                            "front_rank": front_rank,
-
-                            "back_suit_strength": back_suit_strength,
-                            "mid_suit_strength": mid_suit_strength,
-                            "front_suit_strength": front_suit_strength,
-
-                            "is_3_straight": self.utils.is_natural_win_three_straight_special_only_straight(
-                                back_rank, mid_rank, front_card),
-                            "is_3_flush": self.utils.is_natural_win_three_flush_special_only_flush(
-                                back_rank, mid_rank, front_card),
-                        }
-                        self.update_arrangement_info_with_back_mid_front_card(arrangement_info,
-                                                                back_card, mid_card, front_card)
-                        data_arrangement.append(arrangement_info)
+                        is_3_straight = self.utils.is_natural_win_three_straight_special_only_straight(
+                                                                        back_rank, mid_rank, front_card)
+                        is_3_flush = self.utils.is_natural_win_three_flush_special_only_flush(
+                                                                        back_rank, mid_rank, front_card)
                         
-        return pd.DataFrame(data_arrangement).drop_duplicates(subset=["back_rank", "mid_rank", "front_rank", 
-                                        "back_suit_strength", "mid_suit_strength", "front_suit_strength"])
+                        arrangement_info = (back_rank, mid_rank, front_rank,
+                                            back_suit_strength, mid_suit_strength, front_suit_strength,
+                                            is_3_straight, is_3_flush)
+                        if arrangement_info not in data_arrangement_with_card:
+                            data_arrangement_with_card[arrangement_info] = (back_card, mid_card, front_card)
+
+        return data_arrangement_with_card
+    
+    def convert_data_arrange_with_card_to_dataframe(self, data_arrange_with_card):
+        df_data_arrange_key = pd.DataFrame(data_arrange_with_card.keys(), columns=["back_rank", "mid_rank", "front_rank",
+                                                        "back_suit_strength", "mid_suit_strength", "front_suit_strength",
+                                                        "is_3_straight", "is_3_flush"])
+        df_data_arrange_value = pd.DataFrame(data_arrange_with_card.values(), columns=["back_card", "mid_card", "front_card"])
+        data_arrange = pd.concat([df_data_arrange_key, df_data_arrange_value], axis=1)
+        del df_data_arrange_key, df_data_arrange_value
+        return data_arrange
+
+    def update_total_proba_to_special_case(self, data_arrange):
+        #Update the total_proba to 300 if bonus condition is satisfied
+        data_arrange.loc[(data_arrange["back_rank"] <= LookupTable.MAX_FOUR_OF_A_KIND) | 
+                         (data_arrange["mid_rank"] <= LookupTable.MAX_FULL_HOUSE) |
+                        ((LookupTable.MAX_STRAIGHT <= data_arrange["front_rank"]) & 
+                         (data_arrange["front_rank"] <= LookupTable.MAX_THREE_OF_A_KIND + 1)), "total_proba"] = 300.0        
 
     def filter_potential_candidate_arrangement(self, data_arrange):
-        data_arrange = self.feature_engineer.create_proba_columns(data_arrange)
+        self.feature_engineer.create_proba_columns(data_arrange)
         data_arrange["total_proba"] = data_arrange["back_proba"] + data_arrange["mid_proba"] + data_arrange["front_proba"]
+        self.update_total_proba_to_special_case(data_arrange)
         data_arrange.sort_values(by="total_proba", ascending=False, inplace=True)
         data_arrange.reset_index(drop=True, inplace=True)
-        data_arrange.drop(columns=["back_proba", "mid_proba", "front_proba", "total_proba"], inplace=True)
+        data_arrange.drop(columns=["total_proba"], inplace=True)
         return data_arrange.iloc[:self.n_potential_candidate_arrangement]
 
     def update_average_point_of_natural_win_3_straight_and_3_flush(self, data_arrange):
         #For the row which is is_3_straight = True or is_3_flush = True, we will update the Average_Point_Predicted to 9.0
         data_arrange.loc[data_arrange["is_3_straight"] | data_arrange["is_3_flush"], 
                          "Average_Point_Predicted"] = 9.0
-        return data_arrange
                 
     def predict_average_point(self, data_arrange):
+        start_time = time.time()
         dataset = self.feature_engineer.transform(data_arrange.copy())
+        end_time_1 = time.time()
+        print(f"Execution time to transform data arrangement: {end_time_1 - start_time} seconds")
         self.normalizer.normalize_dataset(dataset)
+        end_time_2 = time.time()
+        print(f"Execution time to normalize dataset: {end_time_2 - end_time_1} seconds")
         X = dataset.values
-        del dataset
         y = self.MLP_model.predict(X)
+        end_time_3 = time.time()
+        print(f"Execution time to predict average point: {end_time_3 - end_time_2} seconds")
         data_arrange["Average_Point_Predicted"] = y
-        del X, y
-        return data_arrange
+        del dataset, X, y
     
     def gen_database_arrangement_with_predict_average_point(self):
         start_time = time.time()
-        data_arrange = self.gen_database_arrangement()
+        data_arrange_with_card = self.gen_database_arrangement()
         end_time_1 = time.time()
         print(f"\nExecution time to generate database arrangement: {end_time_1 - start_time} seconds")
-        data_arrange = self.filter_potential_candidate_arrangement(data_arrange)
+        data_arrange = self.convert_data_arrange_with_card_to_dataframe(data_arrange_with_card)
+        del data_arrange_with_card
         end_time_2 = time.time()
-        print(f"Execution time to filter potential candidate arrangement: {end_time_2 - end_time_1} seconds")
-        data_arrange = self.predict_average_point(data_arrange)
+        print(f"Execution time to convert data arrangement with card to dataframe: {end_time_2 - end_time_1} seconds")
+        data_arrange = self.filter_potential_candidate_arrangement(data_arrange)
         end_time_3 = time.time()
-        print(f"Execution time to predict average point: {end_time_3 - end_time_2} seconds")
-        data_arrange = self.update_average_point_of_natural_win_3_straight_and_3_flush(data_arrange)
+        print(f"Execution time to filter potential candidate arrangement: {end_time_3 - end_time_2} seconds")
+        self.predict_average_point(data_arrange)
+        self.update_average_point_of_natural_win_3_straight_and_3_flush(data_arrange)
         return data_arrange
 
     def get_best_arrangement(self):

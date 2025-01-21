@@ -54,7 +54,7 @@ if __name__ == "__main__":
     import numpy as np
 
     list_time = []
-    for i in range(10):
+    for i in range(100):
         full_deck = list(range(52))
         np.random.shuffle(full_deck)
         list_card_value = full_deck[:13]

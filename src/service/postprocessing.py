@@ -36,14 +36,10 @@ class PostProcessing:
         return hand_output
 
     def process_and_format_data_arrangement(self, data_arrangement) -> dict:
-        back_card = tuple(data_arrangement[f"back_card_{i}"] for i in range(1, 6))
-        mid_card = tuple(data_arrangement[f"mid_card_{i}"] for i in range(1, 6))
-        front_card = tuple(data_arrangement[f"front_card_{i}"] for i in range(1, 4))
-
         return {
-            "segment_1": self.postprocessing_hand(back_card),
-            "segment_2": self.postprocessing_hand(mid_card),
-            "segment_3": self.postprocessing_hand(front_card)
+            "segment_1": self.postprocessing_hand(data_arrangement["back_card"]),
+            "segment_2": self.postprocessing_hand(data_arrangement["mid_card"]),
+            "segment_3": self.postprocessing_hand(data_arrangement["front_card"]),
         }
 
     def postprocessing_output(self) -> dict:
