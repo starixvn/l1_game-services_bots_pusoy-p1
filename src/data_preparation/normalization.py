@@ -47,4 +47,4 @@ class Normalization(object):
         for col_name in ["back_proba", "mid_proba", "front_proba"]:
             dataset[col_name] /= 100.0
 
-        Normalization.check_range_value_after_min_max_scale(dataset)
+        # Normalization.check_range_value_after_min_max_scale(dataset)

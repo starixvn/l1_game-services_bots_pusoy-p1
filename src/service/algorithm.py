@@ -24,10 +24,20 @@ class PusoyBot(object):
         self.normalizer = Normalization()
         self.n_potential_candidate_arrangement = n_potential_candidate_arrangement
 
+    def convert_data_arrange_with_card_to_dataframe(self, data_arrange_with_card):
+        df_data_arrange_key = pd.DataFrame(data_arrange_with_card.keys(), columns=["back_rank", "mid_rank", "front_rank",
+                                                        "back_suit_strength", "mid_suit_strength", "front_suit_strength",
+                                                        "is_3_straight", "is_3_flush"])
+        df_data_arrange_value = pd.DataFrame(data_arrange_with_card.values(), columns=["back_card", "mid_card", "front_card"])
+        data_arrange = pd.concat([df_data_arrange_key, df_data_arrange_value], axis=1)
+        del df_data_arrange_key, df_data_arrange_value
+        return data_arrange
+
     def gen_database_arrangement(self) -> pd.DataFrame:
         """
         This function is used to generate the database of all possible arrangements of the given 13 cards.
         """
+        start_time = time.time()
         data_arrangement_with_card = dict()
         for back_card in itertools.combinations(self.board, 5):
             back_rank = self.evaluator.evaluate(back_card, tuple())  
@@ -60,23 +70,22 @@ class PusoyBot(object):
                         if arrangement_info not in data_arrangement_with_card:
                             data_arrangement_with_card[arrangement_info] = (back_card, mid_card, front_card)
 
-        return data_arrangement_with_card
-    
-    def convert_data_arrange_with_card_to_dataframe(self, data_arrange_with_card):
-        df_data_arrange_key = pd.DataFrame(data_arrange_with_card.keys(), columns=["back_rank", "mid_rank", "front_rank",
-                                                        "back_suit_strength", "mid_suit_strength", "front_suit_strength",
-                                                        "is_3_straight", "is_3_flush"])
-        df_data_arrange_value = pd.DataFrame(data_arrange_with_card.values(), columns=["back_card", "mid_card", "front_card"])
-        data_arrange = pd.concat([df_data_arrange_key, df_data_arrange_value], axis=1)
-        del df_data_arrange_key, df_data_arrange_value
+        end_time_1 = time.time()
+        print(f"\nExecution time to generate data arrangement with card: {end_time_1 - start_time} seconds")
+        data_arrange = self.convert_data_arrange_with_card_to_dataframe(data_arrangement_with_card)
+        end_time_2 = time.time()
+        print(f"Execution time to convert data arrangement with card to dataframe: {end_time_2 - end_time_1} seconds")
+        del data_arrangement_with_card 
         return data_arrange
 
     def update_total_proba_to_special_case(self, data_arrange):
-        #Update the total_proba to 300 if bonus condition is satisfied
+        #Update the total_proba to 300 if bonus condition is satisfied or is_3_straight = True or is_3_flush = True
         data_arrange.loc[(data_arrange["back_rank"] <= LookupTable.MAX_FOUR_OF_A_KIND) | 
                          (data_arrange["mid_rank"] <= LookupTable.MAX_FULL_HOUSE) |
                         ((LookupTable.MAX_STRAIGHT <= data_arrange["front_rank"]) & 
-                         (data_arrange["front_rank"] <= LookupTable.MAX_THREE_OF_A_KIND + 1)), "total_proba"] = 300.0        
+                         (data_arrange["front_rank"] <= LookupTable.MAX_THREE_OF_A_KIND + 1)) |
+                         (data_arrange["is_3_straight"]) | 
+                         (data_arrange["is_3_flush"]), "total_proba"] = 300.0        
 
     def filter_potential_candidate_arrangement(self, data_arrange):
         self.feature_engineer.create_proba_columns(data_arrange)
@@ -108,17 +117,11 @@ class PusoyBot(object):
         del dataset, X, y
     
     def gen_database_arrangement_with_predict_average_point(self):
+        data_arrange = self.gen_database_arrangement()
         start_time = time.time()
-        data_arrange_with_card = self.gen_database_arrangement()
-        end_time_1 = time.time()
-        print(f"\nExecution time to generate database arrangement: {end_time_1 - start_time} seconds")
-        data_arrange = self.convert_data_arrange_with_card_to_dataframe(data_arrange_with_card)
-        del data_arrange_with_card
-        end_time_2 = time.time()
-        print(f"Execution time to convert data arrangement with card to dataframe: {end_time_2 - end_time_1} seconds")
         data_arrange = self.filter_potential_candidate_arrangement(data_arrange)
-        end_time_3 = time.time()
-        print(f"Execution time to filter potential candidate arrangement: {end_time_3 - end_time_2} seconds")
+        end_time_1 = time.time()
+        print(f"Execution time to filter potential candidate arrangement: {end_time_1 - start_time} seconds")
         self.predict_average_point(data_arrange)
         self.update_average_point_of_natural_win_3_straight_and_3_flush(data_arrange)
         return data_arrange

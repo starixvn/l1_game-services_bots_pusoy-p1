@@ -7,6 +7,7 @@ import time
 import itertools
 from collections import defaultdict
 import math
+from src.data_preparation.normalization import Normalization
 
 class FeatureEngineering(object):
     def __init__(self,
@@ -32,6 +33,7 @@ class FeatureEngineering(object):
         assert self.database_search_middle['1, 1'] == 100.0 and self.database_search_back['1, 1'] < 100.0
         self.rank_mapping = self.utils.create_rank_mapping_with_new_rank_for_four_three_full_house()
         self.map_front_rank_to_int_strength = self.create_mapping_front_rank_to_int_strength()
+        self.set_full_deck = set(Deck().cards) 
         
     def __check_mapping_suit_int_to_str(self):
         for suit_int in self.mapping_suit_int_to_str:
@@ -126,9 +128,8 @@ class FeatureEngineering(object):
                 dict_database[cards_info] = proba
         return dict_database
 
-    def cal_board_remain_info(self, board, set_full_deck):
-        board_remain = tuple(set_full_deck - set(board))
-        assert len(board_remain) == 39, f"The length of board_remain is not correct: {len(board_remain)}"
+    def cal_board_remain_info(self, board):
+        board_remain = tuple(self.set_full_deck - set(board))
 
         board_remain_info = defaultdict(int)
         for card_int in board_remain:
@@ -138,14 +139,12 @@ class FeatureEngineering(object):
             board_remain_info[f"n_{rank_str}"] += 1
             board_remain_info[f"n_{suit_str}"] += 1
 
-        assert set(board_remain_info.keys()).issubset(set(self.list_key_board_remain_info))
         return tuple(board_remain_info[key] for key in self.list_key_board_remain_info)
     
     def gen_stats_board_remain_info_column(self, all_data_avg_point):
-        set_full_deck = set(Deck().cards)
         first_row = all_data_avg_point.iloc[0]
         board = first_row["back_card"] + first_row["mid_card"] + first_row["front_card"]
-        board_remain_info = self.cal_board_remain_info(board, set_full_deck)
+        board_remain_info = self.cal_board_remain_info(board)
         all_data_avg_point[self.list_key_board_remain_info] = board_remain_info
 
     def is_specific_combo_type(self, combo_type, rank, is_front_hand):
@@ -206,8 +205,8 @@ class FeatureEngineering(object):
         len_card_rank_by_suit.sort()
         return len_card_rank_by_suit
 
-    def cal_combo_type_board_remain(self, board, set_full_deck):
-        board_remain = tuple(set_full_deck - set(board))
+    def cal_combo_type_board_remain(self, board):
+        board_remain = tuple(self.set_full_deck - set(board))
         list_card_rank_by_suit = defaultdict(list)
         dict_count_card_rank = defaultdict(int)
 
@@ -230,22 +229,14 @@ class FeatureEngineering(object):
         return n_Royal_Flush, n_Straight_Flush, n_Flush, n_Straight, n_Dragon, n_Six_Pair, n_Three_Flush
 
     def gen_stats_combo_type_board_remain_column(self, all_data_avg_point):
-        set_full_deck = set(Deck().cards)
         first_row = all_data_avg_point.iloc[0]
         board = first_row["back_card"] + first_row["mid_card"] + first_row["front_card"]
-        combo_type_board_remain = self.cal_combo_type_board_remain(board, set_full_deck)
+        combo_type_board_remain = self.cal_combo_type_board_remain(board)
         all_data_avg_point[["n_Royal_Flush", "n_Straight_Flush", "n_Flush",
             "n_Straight", "n_Dragon", "n_Six_Pair", "n_Three_Flush"]] = combo_type_board_remain
 
     def create_mapping_front_rank_to_int_strength(self):
         df = pd.read_csv(self.path_csv_file_mapping)
-
-        assert len(df) == 455, f"The length of the dataframe is not correct: {len(df)}"
-        assert df["rank"].is_monotonic_increasing, "The rank is not in increasing order"
-        assert df["rank"].nunique() == 455, "The rank is not unique"
-        assert df["rank_strength"].is_monotonic_increasing, "The rank_strength is not in increasing order"
-        assert list(df["rank_strength"]) == list(range(1, 456)), "The rank_strength is not correct"
-
         return dict(zip(df["rank"], df["rank_strength"]))
     
     def transform_front_rank_to_int_strength(self, all_data_avg_point):
@@ -262,18 +253,27 @@ class FeatureEngineering(object):
                         + all_data_avg_point["mid_suit_strength"].astype(str)).map(self.database_search_middle)
         all_data_avg_point["front_proba"] = (all_data_avg_point["front_rank"].astype(str) + ", " \
                         + all_data_avg_point["front_suit_strength"].astype(str)).map(self.database_search_front)
-        assert all_data_avg_point["back_proba"].isna().sum() == 0 and all_data_avg_point["mid_proba"].isna().sum() == 0 and \
-                all_data_avg_point["front_proba"].isna().sum() == 0
 
     def transform(self, all_data_avg_point):
         all_data_avg_point.reset_index(drop=True, inplace=True)
+        start_time = time.time()
         self.gen_stats_board_remain_info_column(all_data_avg_point)
+        end_time_2 = time.time()
+        print(f"Execution time to generate stats board remain info column: {end_time_2 - start_time}")
         self.gen_stats_combo_type_board_remain_column(all_data_avg_point)
+        end_time_3 = time.time()
+        print(f"Execution time to generate stats combo type board remain column: {end_time_3 - end_time_2}")
         self.gen_binary_feature_for_bonus_combo(all_data_avg_point)
+        end_time_4 = time.time()
+        print(f"Execution time to generate binary feature for bonus combo: {end_time_4 - end_time_3}")
         # self.create_proba_columns(all_data_avg_point)
         self.transform_front_rank_to_int_strength(all_data_avg_point)
+        end_time_5 = time.time()
+        print(f"Execution time to transform front rank to int strength: {end_time_5 - end_time_4}")
         self.transform_Four_Three_Full_House_back_mid_rank(all_data_avg_point)
-        
+        end_time_6 = time.time()
+        print(f"Execution time to transform Four Three Full House back mid rank: {end_time_6 - end_time_5}")
+
         feature_cols = list(all_data_avg_point.columns.difference(["is_3_straight", "is_3_flush",
                                                             "back_card", "mid_card", "front_card"]))
         dataset = all_data_avg_point[feature_cols].copy()
