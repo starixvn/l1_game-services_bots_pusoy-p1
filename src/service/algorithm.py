@@ -163,9 +163,9 @@ class PusoyBot(object):
 
     def print_one_arrangement(self, data) -> None:
         print("\nAverage Point Predicted:", data["Average_Point_Predicted"])
-        self.print_one_hand("Back", tuple(data[col] for col in self.feature_engineer.list_back_card_name))
-        self.print_one_hand("Mid", tuple(data[col] for col in self.feature_engineer.list_mid_card_name))
-        self.print_one_hand("Front", tuple(data[col] for col in self.feature_engineer.list_front_card_name))
+        self.print_one_hand("Back", data["back_card"])
+        self.print_one_hand("Mid", data["mid_card"])
+        self.print_one_hand("Front", data["front_card"])
 
 
 

@@ -85,9 +85,11 @@ async def get_suggest(request_card: Request) -> JSONResponse:
 
 
 if __name__ == "__main__":
+    print("The number of CPU cores is:", psutil.cpu_count(logical=False) - 1)
     uvicorn.run(
         app='app:app', 
         host=APP_HOST, 
         port=APP_PORT, 
+        workers=psutil.cpu_count(logical=False) - 1,
         log_level='info'
     )
