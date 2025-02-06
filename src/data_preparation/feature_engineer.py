@@ -3,7 +3,6 @@ from treys import Card, Deck
 import numpy as np
 from src.utils.poker_evaluator import ChinesePokerEvaluator
 from src.utils.utils import Utils
-import time
 import itertools
 from collections import defaultdict
 import math
@@ -256,23 +255,12 @@ class FeatureEngineering(object):
 
     def transform(self, all_data_avg_point):
         all_data_avg_point.reset_index(drop=True, inplace=True)
-        start_time = time.time()
         self.gen_stats_board_remain_info_column(all_data_avg_point)
-        end_time_2 = time.time()
-        print(f"Execution time to generate stats board remain info column: {end_time_2 - start_time}")
         self.gen_stats_combo_type_board_remain_column(all_data_avg_point)
-        end_time_3 = time.time()
-        print(f"Execution time to generate stats combo type board remain column: {end_time_3 - end_time_2}")
         self.gen_binary_feature_for_bonus_combo(all_data_avg_point)
-        end_time_4 = time.time()
-        print(f"Execution time to generate binary feature for bonus combo: {end_time_4 - end_time_3}")
         # self.create_proba_columns(all_data_avg_point)
         self.transform_front_rank_to_int_strength(all_data_avg_point)
-        end_time_5 = time.time()
-        print(f"Execution time to transform front rank to int strength: {end_time_5 - end_time_4}")
         self.transform_Four_Three_Full_House_back_mid_rank(all_data_avg_point)
-        end_time_6 = time.time()
-        print(f"Execution time to transform Four Three Full House back mid rank: {end_time_6 - end_time_5}")
 
         feature_cols = list(all_data_avg_point.columns.difference(["is_3_straight", "is_3_flush",
                                                             "back_card", "mid_card", "front_card"]))

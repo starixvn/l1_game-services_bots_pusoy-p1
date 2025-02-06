@@ -37,7 +37,6 @@ class PusoyBot(object):
         """
         This function is used to generate the database of all possible arrangements of the given 13 cards.
         """
-        start_time = time.time()
         data_arrangement_with_card = dict()
         for back_card in itertools.combinations(self.board, 5):
             back_rank = self.evaluator.evaluate(back_card, tuple())  
@@ -70,11 +69,7 @@ class PusoyBot(object):
                         if arrangement_info not in data_arrangement_with_card:
                             data_arrangement_with_card[arrangement_info] = (back_card, mid_card, front_card)
 
-        end_time_1 = time.time()
-        print(f"\nExecution time to generate data arrangement with card: {end_time_1 - start_time} seconds")
         data_arrange = self.convert_data_arrange_with_card_to_dataframe(data_arrangement_with_card)
-        end_time_2 = time.time()
-        print(f"Execution time to convert data arrangement with card to dataframe: {end_time_2 - end_time_1} seconds")
         del data_arrangement_with_card 
         return data_arrange
 
@@ -102,26 +97,16 @@ class PusoyBot(object):
                          "Average_Point_Predicted"] = 9.0
                 
     def predict_average_point(self, data_arrange):
-        start_time = time.time()
         dataset = self.feature_engineer.transform(data_arrange.copy())
-        end_time_1 = time.time()
-        print(f"Execution time to transform data arrangement: {end_time_1 - start_time} seconds")
         self.normalizer.normalize_dataset(dataset)
-        end_time_2 = time.time()
-        print(f"Execution time to normalize dataset: {end_time_2 - end_time_1} seconds")
         X = dataset.values
         y = self.MLP_model.predict(X)
-        end_time_3 = time.time()
-        print(f"Execution time to predict average point: {end_time_3 - end_time_2} seconds")
         data_arrange["Average_Point_Predicted"] = y
         del dataset, X, y
     
     def gen_database_arrangement_with_predict_average_point(self):
         data_arrange = self.gen_database_arrangement()
-        start_time = time.time()
         data_arrange = self.filter_potential_candidate_arrangement(data_arrange)
-        end_time_1 = time.time()
-        print(f"Execution time to filter potential candidate arrangement: {end_time_1 - start_time} seconds")
         self.predict_average_point(data_arrange)
         self.update_average_point_of_natural_win_3_straight_and_3_flush(data_arrange)
         return data_arrange
