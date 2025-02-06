@@ -1,5 +1,5 @@
 # Stage 1: Build stage
-FROM tensorflow/tensorflow:latest
+FROM hub.lumigame.com/docker-hub/tensorflow/tensorflow:latest
 
 # Set environment variables to avoid writing bytecode and enable unbuffered mode
 ENV PYTHONDONTWRITEBYTECODE=1
