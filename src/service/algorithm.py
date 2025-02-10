@@ -86,10 +86,11 @@ class PusoyBot(object):
         self.feature_engineer.create_proba_columns(data_arrange)
         data_arrange["total_proba"] = data_arrange["back_proba"] + data_arrange["mid_proba"] + data_arrange["front_proba"]
         self.update_total_proba_to_special_case(data_arrange)
+        n_total_proba_special_case = (data_arrange["total_proba"] == 300.0).sum()
         data_arrange.sort_values(by="total_proba", ascending=False, inplace=True)
         data_arrange.reset_index(drop=True, inplace=True)
         data_arrange.drop(columns=["total_proba"], inplace=True)
-        return data_arrange.iloc[:self.n_potential_candidate_arrangement]
+        return data_arrange.iloc[:max(self.n_potential_candidate_arrangement, n_total_proba_special_case)]
 
     def update_average_point_of_natural_win_3_straight_and_3_flush(self, data_arrange):
         #For the row which is is_3_straight = True or is_3_flush = True, we will update the Average_Point_Predicted to 9.0
