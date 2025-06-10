@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+pydantic
+treys
+numpy
+pandas
+psutil
+prometheus-fastapi-instrumentator==6.1.0
+# tensorflow
+keras
+redis
+celery
+python-dotenv
+celery[redis]
+fastapi[redis]
+fastapi-cache2[redis]
